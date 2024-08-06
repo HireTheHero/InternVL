@@ -20,8 +20,6 @@ tensorboardX
 termcolor
 timm==0.9.12
 tokenizers==0.15.1
-torch>=2
-torchvision>=0.15
 tqdm
 transformers==4.37.2
 yacs

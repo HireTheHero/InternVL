@@ -96,8 +96,17 @@ def evaluate_chat_model():
                 pixel_values=pixel_values,
                 question=question,
                 generation_config=generation_config,
-                verbose=True
+                output_attentions=args.output_attentions,
+                output_hidden_states=args.output_hidden_states,
+                verbose=False,
             )
+            print("type(pred)", type(pred))
+            # print("pred", pred)
+            # print("pred['response']", pred['response'])
+            print("type(pred['hidden_states'])", type(pred['hidden_states']), len(pred['hidden_states']))
+            print("type(pred['hidden_states'][0])", type(pred['hidden_states'][0]), len(pred['hidden_states'][0]))
+            print("type(pred['hidden_states'][0][0])", type(pred['hidden_states'][0][0]), pred['hidden_states'][0][0].shape)
+            exit()
 
             outputs[f'v1_{question_id}'] = pred
 
@@ -125,8 +134,14 @@ if __name__ == '__main__':
     parser.add_argument('--load-in-8bit', action='store_true')
     parser.add_argument('--load-in-4bit', action='store_true')
     parser.add_argument('--auto', action='store_true')
+    parser.add_argument('--output-attentions', action='store_true')
+    parser.add_argument('--output-hidden-states', action='store_true')
     args = parser.parse_args()
 
+    for ky in ds_collections.keys():
+        for ky2, vl2 in ds_collections[ky].items():
+            if isinstance(vl2, str) and '/' in vl2:
+                ds_collections[ky][ky2] = f'{os.getenv("HOME")}/{vl2}'
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
 

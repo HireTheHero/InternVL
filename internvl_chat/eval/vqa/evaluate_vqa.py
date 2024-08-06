@@ -223,7 +223,7 @@ def collate_fn(batches, tokenizer):
 class VQADataset(torch.utils.data.Dataset):
 
     def __init__(self, train, test, prompt, few_shot, input_size=224, dynamic_image_size=False,
-                 use_thumbnail=False, max_num=6):
+                 use_thumbnail=False, max_num=6, root_dir=""):
         self.test = open(test).readlines()
         self.prompt = prompt
         self.input_size = input_size
@@ -234,6 +234,7 @@ class VQADataset(torch.utils.data.Dataset):
         if few_shot > 0:
             self.train = open(train).readlines()
         self.transform = build_transform(is_train=False, input_size=input_size)
+        self.root_dir = root_dir
 
     def __len__(self):
         return len(self.test)
@@ -252,7 +253,7 @@ class VQADataset(torch.utils.data.Dataset):
                     sample['image'],
                     sample['question']) + f" {sample['answer']}"
 
-        image = Image.open(image).convert('RGB')
+        image = Image.open(f"{self.root_dir}{image}").convert('RGB')
         if self.dynamic_image_size:
             images = dynamic_preprocess(image, image_size=self.input_size,
                                         use_thumbnail=self.use_thumbnail,
@@ -343,7 +344,8 @@ def evaluate_chat_model():
             input_size=image_size,
             dynamic_image_size=args.dynamic,
             use_thumbnail=use_thumbnail,
-            max_num=args.max_num
+            max_num=args.max_num,
+            root_dir=args.root_dir
         )
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
@@ -370,8 +372,17 @@ def evaluate_chat_model():
                 pixel_values=pixel_values,
                 question=questions[0],
                 generation_config=generation_config,
-                verbose=True
+                output_attentions=args.output_attentions,
+                output_hidden_states=args.output_hidden_states,
+                verbose=False
             )
+            print("type(pred)", type(pred))
+            # print("pred", pred)
+            # print("pred['response']", pred['response'])
+            print("type(pred['hidden_states'])", type(pred['hidden_states']), len(pred['hidden_states']))
+            print("type(pred['hidden_states'][0])", type(pred['hidden_states'][0]), len(pred['hidden_states'][0]))
+            print("type(pred['hidden_states'][0][0])", type(pred['hidden_states'][0][0]), pred['hidden_states'][0][0].shape)
+            exit()
             answers = [pred]
 
             for question, question_id, answer, annotation in zip(questions, question_ids, answers, annotations):
@@ -464,13 +475,15 @@ def evaluate_chat_model():
                 summaries.append([ds_name, {'relaxed_accuracy': relaxed_accuracy}])
             elif ds_collections[ds_name]['metric'] == 'accuracy':
                 if 'gqa' in ds_name:
-                    dst_file = './data/gqa/testdev_balanced_predictions.json'
+                    # dst_file = './data/gqa/testdev_balanced_predictions.json'
+                    dst_file = '~/data/gqa/testdev_balanced_predictions.json'
                     print('python eval/vqa/convert_gqa_for_eval.py --src ' +
                           results_file + ' --dst ' + dst_file)
                     python_path = 'python'
                     os.system(python_path + ' eval/vqa/convert_gqa_for_eval.py --src ' +
                               results_file + ' --dst ' + dst_file)
-                    command = f'cd ./data/gqa/ && {python_path} eval.py --tier testdev_balanced && cd ../../'
+                    # command = f'cd ./data/gqa/ && {python_path} eval.py --tier testdev_balanced && cd ../../'
+                    command = f'cd ~/data/gqa/ && {python_path} eval.py --tier testdev_balanced && cd ../../'
                     print(command)
                     accuracy = subprocess.check_output(command, shell=True, universal_newlines=True)
                 else:
@@ -507,8 +520,15 @@ if __name__ == '__main__':
     parser.add_argument('--load-in-8bit', action='store_true')
     parser.add_argument('--load-in-4bit', action='store_true')
     parser.add_argument('--auto', action='store_true')
+    parser.add_argument('--output-attentions', action='store_true')
+    parser.add_argument('--output-hidden-states', action='store_true')
+    parser.add_argument('--root-dir', type=str, default='')
     args = parser.parse_args()
 
+    for ky in ds_collections.keys():
+        for ky2, vl2 in ds_collections[ky].items():
+            if isinstance(vl2, str) and '/' in vl2:
+                ds_collections[ky][ky2] = f'{os.getenv("HOME")}/{vl2}'
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
 

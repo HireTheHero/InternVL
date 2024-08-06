@@ -2,7 +2,8 @@ set -x
 
 CHECKPOINT=${1}
 DATASET=${2}
-CHECKPOINT="$(pwd)/${CHECKPOINT}"
+CHECKPOINT="$HOME/${CHECKPOINT}"
+REPR=${3:-""}
 export PYTHONPATH="$(pwd):${PYTHONPATH}"
 echo "CHECKPOINT: ${CHECKPOINT}"
 
@@ -100,53 +101,156 @@ if [ ${DATASET} == "vqa-okvqa-val" ]; then
 fi
 
 if [ ${DATASET} == "vqa-textvqa-val" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        echo "attention-beasd evaluation"
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        echo "hidden-state-beasd evaluation"
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        echo "normal evaluation"
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-textvqa-val-ocr" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-vizwiz-val" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-vizwiz-test" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-vqav2-testdev" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-ai2d-test" ]; then
@@ -160,23 +264,63 @@ if [ ${DATASET} == "vqa-ai2d-test" ]; then
 fi
 
 if [ ${DATASET} == "vqa-vqav2-val" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-gqa-testdev" ]; then
-    torchrun \
-    --nnodes=1 \
-    --node_rank=0 \
-    --master_addr=127.0.0.1 \
-    --nproc_per_node=${GPUS} \
-    --master_port=${MASTER_PORT} \
-    eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+        --nnodes=1 \
+        --node_rank=0 \
+        --master_addr=127.0.0.1 \
+        --nproc_per_node=${GPUS} \
+        --master_port=${MASTER_PORT} \
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --root-dir $HOME/ "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "vqa-docvqa-val" ]; then
@@ -395,7 +539,15 @@ if [ ${DATASET} == "tiny_lvlm" ]; then
 fi
 
 if [ ${DATASET} == "mmvet" ]; then
-    python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet --output-attentions "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet --output-hidden-states "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet "${ARGS[@]:2}"
+    fi
 fi
 
 if [ ${DATASET} == "cmmmu" ]; then
@@ -409,33 +561,102 @@ if [ ${DATASET} == "cmmmu" ]; then
 fi
 
 if [ ${DATASET} == "mmbench-dev-en" ]; then
-    torchrun \
-      --nnodes=1 \
-      --node_rank=0 \
-      --master_addr=127.0.0.1 \
-      --nproc_per_node=${GPUS} \
-      --master_port=${MASTER_PORT} \
-      eval/mmbench/evaluate_mmbench.py --checkpoint ${CHECKPOINT} --datasets mmbench_dev_20230712 "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_20230712 \
+                                            --output-attentions "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_20230712 \
+                                            --output-hidden-states "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_20230712 \
+                                            "${ARGS[@]:4}"
+    fi
 fi
 
 if [ ${DATASET} == "mmbench-dev-cn" ]; then
-    torchrun \
-      --nnodes=1 \
-      --node_rank=0 \
-      --master_addr=127.0.0.1 \
-      --nproc_per_node=${GPUS} \
-      --master_port=${MASTER_PORT} \
-      eval/mmbench/evaluate_mmbench.py --checkpoint ${CHECKPOINT} --datasets mmbench_dev_cn_20231003 "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_cn_20231003 \
+                                            --output-attentions "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_cn_20231003 \
+                                            --output-hidden-states "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_cn_20231003 \
+                                            "${ARGS[@]:4}"
+    fi
 fi
 
 if [ ${DATASET} == "mmbench-test-en" ]; then
-    torchrun \
-      --nnodes=1 \
-      --node_rank=0 \
-      --master_addr=127.0.0.1 \
-      --nproc_per_node=${GPUS} \
-      --master_port=${MASTER_PORT} \
-      eval/mmbench/evaluate_mmbench.py --checkpoint ${CHECKPOINT} --datasets mmbench_test_en_20231003 "${ARGS[@]:2}"
+    if [[ ${REPR} == *"attention"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_test_en_20231003 \
+                                            --output-attentions "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} == *"hidden"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_test_en_20231003 \
+                                            --output-hidden-states "${ARGS[@]:4}"
+    fi
+    if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
+        torchrun \
+          --nnodes=1 \
+          --node_rank=0 \
+          --master_addr=127.0.0.1 \
+          --nproc_per_node=${GPUS} \
+          --master_port=${MASTER_PORT} \
+          eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_test_en_20231003 \
+                                            "${ARGS[@]:4}"
+    fi
 fi
 
 if [ ${DATASET} == "mmbench-test-cn" ]; then

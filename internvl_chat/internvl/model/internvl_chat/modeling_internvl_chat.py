@@ -253,7 +253,7 @@ class InternVLChatModel(PreTrainedModel):
 
     def batch_chat(self, tokenizer, pixel_values, questions, generation_config, num_patches_list=None,
                    history=None, return_history=False, IMG_START_TOKEN='<img>', IMG_END_TOKEN='</img>',
-                   IMG_CONTEXT_TOKEN='<IMG_CONTEXT>', verbose=False, image_counts=None):
+                   IMG_CONTEXT_TOKEN='<IMG_CONTEXT>', verbose=False, image_counts=None, return_dict=False):
         if history is not None or return_history:
             print('Now multi-turn chat is not supported in batch_chat.')
             raise NotImplementedError
@@ -293,6 +293,7 @@ class InternVLChatModel(PreTrainedModel):
             pixel_values=pixel_values,
             input_ids=input_ids,
             attention_mask=attention_mask,
+            return_dict=return_dict,
             **generation_config
         )
         responses = tokenizer.batch_decode(generation_output, skip_special_tokens=True)
@@ -301,7 +302,7 @@ class InternVLChatModel(PreTrainedModel):
 
     def chat(self, tokenizer, pixel_values, question, generation_config, history=None, return_history=False,
              num_patches_list=None, IMG_START_TOKEN='<img>', IMG_END_TOKEN='</img>', IMG_CONTEXT_TOKEN='<IMG_CONTEXT>',
-             verbose=False):
+             verbose=False, output_attentions=False, output_hidden_states=False):
 
         if history is None and pixel_values is not None and '<image>' not in question:
             question = '<image>\n' + question
@@ -341,10 +342,25 @@ class InternVLChatModel(PreTrainedModel):
             pixel_values=pixel_values,
             input_ids=input_ids,
             attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
             **generation_config
         )
+        if isinstance(generation_output, dict):
+            attentions, hidden_states = None, None
+            if 'attentions' in generation_output.keys():
+                attentions = generation_output['attentions']
+            if 'hidden_states' in generation_output.keys():
+                hidden_states = generation_output['hidden_states']
+            generation_output = generation_output['sequences']
+            other_outputs = {'attentions': attentions, 'hidden_states': hidden_states}
+        else:
+            other_outputs = None
         response = tokenizer.batch_decode(generation_output, skip_special_tokens=True)[0]
         response = response.split(template.sep)[0].strip()
+        if other_outputs is not None:
+            response = {"response": response}
+            response.update(other_outputs)
         history.append((question, response))
         if return_history:
             return response, history
@@ -363,8 +379,8 @@ class InternVLChatModel(PreTrainedModel):
             attention_mask: Optional[torch.LongTensor] = None,
             visual_features: Optional[torch.FloatTensor] = None,
             generation_config: Optional[GenerationConfig] = None,
+            output_attentions: Optional[bool] = None,
             output_hidden_states: Optional[bool] = None,
-            return_dict: Optional[bool] = None,
             **generate_kwargs,
     ) -> torch.LongTensor:
 
@@ -391,8 +407,8 @@ class InternVLChatModel(PreTrainedModel):
             inputs_embeds=input_embeds,
             attention_mask=attention_mask,
             generation_config=generation_config,
+            output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
             use_cache=True,
             **generate_kwargs,
         )
