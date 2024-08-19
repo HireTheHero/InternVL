@@ -4,6 +4,8 @@ CHECKPOINT=${1}
 DATASET=${2}
 CHECKPOINT="$HOME/${CHECKPOINT}"
 REPR=${3:-""}
+# ROOT_PREFIX=multiple_inputs_
+ROOT_PREFIX=${4}
 export PYTHONPATH="$(pwd):${PYTHONPATH}"
 echo "CHECKPOINT: ${CHECKPOINT}"
 
@@ -109,7 +111,7 @@ if [ ${DATASET} == "vqa-textvqa-val" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         echo "hidden-state-beasd evaluation"
@@ -119,7 +121,7 @@ if [ ${DATASET} == "vqa-textvqa-val" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         echo "normal evaluation"
@@ -141,7 +143,7 @@ if [ ${DATASET} == "vqa-textvqa-val-ocr" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -150,7 +152,7 @@ if [ ${DATASET} == "vqa-textvqa-val-ocr" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets textvqa_val_ocr --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -171,7 +173,7 @@ if [ ${DATASET} == "vqa-vizwiz-val" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -180,7 +182,7 @@ if [ ${DATASET} == "vqa-vizwiz-val" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_val --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -201,7 +203,7 @@ if [ ${DATASET} == "vqa-vizwiz-test" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -210,7 +212,7 @@ if [ ${DATASET} == "vqa-vizwiz-test" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vizwiz_test --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -231,7 +233,7 @@ if [ ${DATASET} == "vqa-vqav2-testdev" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -240,7 +242,7 @@ if [ ${DATASET} == "vqa-vqav2-testdev" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_testdev --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -271,7 +273,7 @@ if [ ${DATASET} == "vqa-vqav2-val" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -280,7 +282,7 @@ if [ ${DATASET} == "vqa-vqav2-val" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets vqav2_val --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -301,7 +303,7 @@ if [ ${DATASET} == "vqa-gqa-testdev" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --output-attentions --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --output-attentions --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -310,7 +312,7 @@ if [ ${DATASET} == "vqa-gqa-testdev" ]; then
         --master_addr=127.0.0.1 \
         --nproc_per_node=${GPUS} \
         --master_port=${MASTER_PORT} \
-        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --output-hidden-states --root-dir $HOME/ "${ARGS[@]:4}"
+        eval/vqa/evaluate_vqa.py --checkpoint ${CHECKPOINT} --datasets gqa_testdev_llava --output-hidden-states --root-dir $HOME/ --test-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -540,10 +542,10 @@ fi
 
 if [ ${DATASET} == "mmvet" ]; then
     if [[ ${REPR} == *"attention"* ]]; then
-        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet --output-attentions "${ARGS[@]:4}"
+        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet --output-attentions --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
-        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet --output-hidden-states "${ARGS[@]:4}"
+        python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet --output-hidden-states --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         python eval/mmvet/evaluate_mmvet.py --checkpoint ${CHECKPOINT} --datasets mmvet "${ARGS[@]:2}"
@@ -569,7 +571,7 @@ if [ ${DATASET} == "mmbench-dev-en" ]; then
           --nproc_per_node=${GPUS} \
           --master_port=${MASTER_PORT} \
           eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_20230712 \
-                                            --output-attentions "${ARGS[@]:4}"
+                                            --output-attentions --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -579,7 +581,7 @@ if [ ${DATASET} == "mmbench-dev-en" ]; then
           --nproc_per_node=${GPUS} \
           --master_port=${MASTER_PORT} \
           eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_20230712 \
-                                            --output-hidden-states "${ARGS[@]:4}"
+                                            --output-hidden-states --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -602,7 +604,7 @@ if [ ${DATASET} == "mmbench-dev-cn" ]; then
           --nproc_per_node=${GPUS} \
           --master_port=${MASTER_PORT} \
           eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_cn_20231003 \
-                                            --output-attentions "${ARGS[@]:4}"
+                                            --output-attentions --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -612,7 +614,7 @@ if [ ${DATASET} == "mmbench-dev-cn" ]; then
           --nproc_per_node=${GPUS} \
           --master_port=${MASTER_PORT} \
           eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_dev_cn_20231003 \
-                                            --output-hidden-states "${ARGS[@]:4}"
+                                            --output-hidden-states --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \
@@ -635,7 +637,7 @@ if [ ${DATASET} == "mmbench-test-en" ]; then
           --nproc_per_node=${GPUS} \
           --master_port=${MASTER_PORT} \
           eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_test_en_20231003 \
-                                            --output-attentions "${ARGS[@]:4}"
+                                            --output-attentions --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} == *"hidden"* ]]; then
         torchrun \
@@ -645,7 +647,7 @@ if [ ${DATASET} == "mmbench-test-en" ]; then
           --nproc_per_node=${GPUS} \
           --master_port=${MASTER_PORT} \
           eval/mmbench/evaluate_mmbench.py  --checkpoint ${CHECKPOINT} --datasets mmbench_test_en_20231003 \
-                                            --output-hidden-states "${ARGS[@]:4}"
+                                            --output-hidden-states --root-prefix $ROOT_PREFIX "${ARGS[@]:4}"
     fi
     if [[ ${REPR} != *"attention"* ]] && [[ ${REPR} != *"hidden"* ]]; then
         torchrun \

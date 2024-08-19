@@ -3,6 +3,7 @@ import itertools
 import json
 import os
 import random
+import re
 import subprocess
 import time
 from functools import partial
@@ -211,13 +212,19 @@ def evaluate_exact_match_accuracy(entries):
     return sum(scores) / len(scores)
 
 
-def collate_fn(batches, tokenizer):
+def collate_fn(batches, has_history=False):
     pixel_values = torch.cat([_['pixel_values'] for _ in batches], dim=0)
     questions = [_['question'] for _ in batches]
     question_ids = [_['question_id'] for _ in batches]
     annotations = [_['annotation'] for _ in batches]
+    batch = (pixel_values, questions, question_ids, annotations)
+    if has_history:
+        histories = [_['history'][0] for _ in batches]
+        batch += (histories,)
+    else:
+        batch += (None,)
 
-    return pixel_values, questions, question_ids, annotations
+    return batch
 
 
 class VQADataset(torch.utils.data.Dataset):
@@ -268,7 +275,87 @@ class VQADataset(torch.utils.data.Dataset):
             'question_id': question_id,
             'question': question,
             'pixel_values': pixel_values,
-            'annotation': annotation
+            'annotation': annotation,
+            'history': None
+        }
+
+
+class MultipleInputsVQADataset(torch.utils.data.Dataset):
+
+    def __init__(self, train, test, prompt, few_shot, input_size=224, dynamic_image_size=False,
+                 use_thumbnail=False, max_num=6, root_dir="", sep="__sep__", task=None):
+        self.test = open(test).readlines()
+        self.prompt = prompt
+        self.input_size = input_size
+        self.dynamic_image_size = dynamic_image_size
+        self.use_thumbnail = use_thumbnail
+        self.few_shot = few_shot
+        self.max_num = max_num
+        if few_shot > 0:
+            self.train = open(train).readlines()
+        self.transform = build_transform(is_train=False, input_size=input_size)
+        self.root_dir = root_dir
+        self.sep = sep
+        self.task = task
+
+    def __len__(self):
+        return len(self.test)
+
+    def _process_image(self, image):
+        image = Image.open(f"{self.root_dir}{image}").convert('RGB')
+        if self.dynamic_image_size:
+            images = dynamic_preprocess(image, image_size=self.input_size,
+                                        use_thumbnail=self.use_thumbnail,
+                                        max_num=self.max_num)
+        else:
+            images = image
+        return images
+
+    def __getitem__(self, idx):
+        data = json.loads(self.test[idx].strip())
+        image, question, question_id, annotation = data['image'], data[
+            'question'], data['question_id'], data.get('answer', None)
+        _, question_id = question_id.split(self.sep)
+        i_history, image = image.split(self.sep)
+        q_history, question = question.split(self.sep)
+        if annotation is not None:
+            annotation_or_annotations = annotation.split(self.sep)
+            if len(annotation_or_annotations)==1:
+                a_history, annotation = annotation_or_annotations[0], None
+            else:
+                a_history, annotation = annotation_or_annotations
+        else:
+            a_history, annotation = None, None
+
+        few_shot_prompt = ''
+        if self.few_shot > 0:
+            few_shot_samples = random.sample(self.train, self.few_shot)
+            for sample in few_shot_samples:
+                sample = json.loads(sample.strip())
+                few_shot_prompt += self.prompt.format(
+                    sample['image'],
+                    sample['question']) + f" {sample['answer']}"
+
+        images = self._process_image(image)
+        images_history = self._process_image(i_history)
+        if self.dynamic_image_size:
+            images=images_history+images
+        else:
+            images = [i_history, image]
+        pixel_values = [self.transform(image) for image in images]
+        pixel_values = torch.stack(pixel_values)
+        if len(self.prompt) != 0:
+            q_history = '<image>\n' + q_history + ' ' + self.prompt
+            question = '<image>\n' + question + ' ' + self.prompt
+        if 'gqa' not in self.task.lower():
+            # textvqa,vizwiz
+            question_id = int(question_id)
+        return {
+            'question_id': question_id,
+            'question': question,
+            'pixel_values': pixel_values,
+            'annotation': annotation,
+            'history': [(q_history, a_history)],
         }
 
 
@@ -336,17 +423,33 @@ def evaluate_chat_model():
         else:
             input_prompt = base_prompt
 
-        dataset = VQADataset(
-            train=ds_collections[ds_name]['train'],
-            test=ds_collections[ds_name]['test'],
-            prompt=input_prompt,
-            few_shot=args.few_shot,
-            input_size=image_size,
-            dynamic_image_size=args.dynamic,
-            use_thumbnail=use_thumbnail,
-            max_num=args.max_num,
-            root_dir=args.root_dir
-        )
+        if args.test_prefix!='':
+            dataset = MultipleInputsVQADataset(
+                train=ds_collections[ds_name]['train'],
+                test=ds_collections[ds_name]['test'],
+                prompt=input_prompt,
+                few_shot=args.few_shot,
+                input_size=image_size,
+                dynamic_image_size=args.dynamic,
+                use_thumbnail=use_thumbnail,
+                max_num=args.max_num,
+                root_dir=args.root_dir,
+                task=ds_name
+            )
+            has_history = True
+        else:
+            dataset = VQADataset(
+                train=ds_collections[ds_name]['train'],
+                test=ds_collections[ds_name]['test'],
+                prompt=input_prompt,
+                few_shot=args.few_shot,
+                input_size=image_size,
+                dynamic_image_size=args.dynamic,
+                use_thumbnail=use_thumbnail,
+                max_num=args.max_num,
+                root_dir=args.root_dir
+            )
+            has_history = False
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
             sampler=InferenceSampler(len(dataset)),
@@ -354,11 +457,11 @@ def evaluate_chat_model():
             num_workers=args.num_workers,
             pin_memory=True,
             drop_last=False,
-            collate_fn=partial(collate_fn, tokenizer=tokenizer),
+            collate_fn=partial(collate_fn, has_history=has_history),
         )
 
         outputs = []
-        for _, (pixel_values, questions, question_ids, annotations) in tqdm(enumerate(dataloader)):
+        for _, (pixel_values, questions, question_ids, annotations, histories) in tqdm(enumerate(dataloader)):
             pixel_values = pixel_values.to(torch.bfloat16).cuda()
             generation_config = dict(
                 num_beams=args.num_beams,
@@ -367,22 +470,31 @@ def evaluate_chat_model():
                 do_sample=True if args.temperature > 0 else False,
                 temperature=args.temperature,
             )
-            pred = model.chat(
+            response = model.chat(
                 tokenizer=tokenizer,
                 pixel_values=pixel_values,
                 question=questions[0],
                 generation_config=generation_config,
                 output_attentions=args.output_attentions,
                 output_hidden_states=args.output_hidden_states,
+                history=histories,
                 verbose=False
             )
-            print("type(pred)", type(pred))
+            if isinstance(response, dict):
+                pred = response['response']
+                if args.output_hidden_states:
+                    state = response['hidden_states']
+                if args.output_attentions:
+                    att = response['attentions']
+            else:
+                pred = response
+            # print("type(pred)", type(pred))
             # print("pred", pred)
             # print("pred['response']", pred['response'])
-            print("type(pred['hidden_states'])", type(pred['hidden_states']), len(pred['hidden_states']))
-            print("type(pred['hidden_states'][0])", type(pred['hidden_states'][0]), len(pred['hidden_states'][0]))
-            print("type(pred['hidden_states'][0][0])", type(pred['hidden_states'][0][0]), pred['hidden_states'][0][0].shape)
-            exit()
+            # print("type(pred['hidden_states'])", type(pred['hidden_states']), len(pred['hidden_states']))
+            # print("type(pred['hidden_states'][0])", type(pred['hidden_states'][0]), len(pred['hidden_states'][0]))
+            # print("type(pred['hidden_states'][0][0])", type(pred['hidden_states'][0][0]), pred['hidden_states'][0][0].shape)
+            # exit()
             answers = [pred]
 
             for question, question_id, answer, annotation in zip(questions, question_ids, answers, annotations):
@@ -444,6 +556,13 @@ def evaluate_chat_model():
             json.dump(merged_outputs, open(results_file, 'w'))
             print('Results saved to {}'.format(results_file))
 
+            # results_file = '/home/s20406/repo/InternVL/internvl_chat/results/textvqa_val_240813074844.json'
+            # results_file = '/home/s20406/repo/InternVL/internvl_chat/results/textvqa_val_240813080725.json'
+            # results_file = '/home/s20406/repo/InternVL/internvl_chat/results/gqa_testdev_llava_240814070720.json'
+            # results_file = '/home/s20406/repo/InternVL/internvl_chat/results/gqa_testdev_llava_240814074001.json'
+            # with open(results_file, "r") as f:
+            #     merged_outputs = json.load(f)
+
             if ds_collections[ds_name]['metric'] == 'vqa_score':
                 evaluator = TextVQAAccuracyEvaluator()
                 annotation = json.load(open(ds_collections[ds_name]['annotation'], 'r'))['annotations']
@@ -454,7 +573,7 @@ def evaluate_chat_model():
                     question_id2answers[question_id] = answers
                 for item in merged_outputs:
                     item['pred_answer'] = item['answer']
-                    item['gt_answers'] = question_id2answers[item['question_id']]
+                    item['gt_answers'] = question_id2answers[int(item['question_id'])]
                 accuracy = evaluator.eval_pred_list(merged_outputs)
                 print(ds_name, accuracy)
                 summaries.append([args.checkpoint, ds_name, accuracy])
@@ -523,17 +642,31 @@ if __name__ == '__main__':
     parser.add_argument('--output-attentions', action='store_true')
     parser.add_argument('--output-hidden-states', action='store_true')
     parser.add_argument('--root-dir', type=str, default='')
+    parser.add_argument('--test-prefix', type=str, default="")
+    parser.add_argument('--remain-from-eval', action='store_true')
     args = parser.parse_args()
+    args.test_prefix = re.sub('test', '', args.test_prefix)
 
-    for ky in ds_collections.keys():
-        for ky2, vl2 in ds_collections[ky].items():
-            if isinstance(vl2, str) and '/' in vl2:
-                ds_collections[ky][ky2] = f'{os.getenv("HOME")}/{vl2}'
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
 
     args.datasets = args.datasets.split(',')
     print('datasets:', args.datasets)
+    # for ds_name in args.datasets:
+    #     root_path = ds_collections[ds_name]['root']
+    #     root_dir, root_name = '/'.join(root_path.split('/')[:-1]), root_path.split('/')[-1]
+    #     root_path = f"{root_dir}/{args.test_prefix}{root_name}"
+    #     ds_collections[ds_name]['root'] = root_path
+    #     for ky2, vl2 in ds_collections[ds_name].items():
+    #         if isinstance(vl2, str) and '/' in vl2:
+    #             ds_collections[ds_name][ky2] = f'{os.getenv("HOME")}/{vl2}'
+    for ky in ds_collections.keys():
+        for ky2, vl2 in ds_collections[ky].items():
+            if ky2=='test':
+                vl2_dir, vl2_name = '/'.join(vl2.split('/')[:-1]), vl2.split('/')[-1]
+                ds_collections[ky][ky2] = vl2 = f'{vl2_dir}/{args.test_prefix}{vl2_name}'
+            if isinstance(vl2, str) and '/' in vl2:
+                ds_collections[ky][ky2] = f'{os.getenv("HOME")}/{vl2}'
     assert args.batch_size == 1, 'Only batch size 1 is supported'
 
     torch.distributed.init_process_group(

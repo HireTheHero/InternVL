@@ -4,6 +4,7 @@ import itertools
 import json
 import os
 import random
+import re
 import time
 from functools import partial
 from io import BytesIO
@@ -63,13 +64,19 @@ ds_collections = {
 }
 
 
-def collate_fn(batches, tokenizer):
+def collate_fn(batches, has_history=False):
     pixel_values = torch.cat([_['pixel_values'] for _ in batches], dim=0)
     questions = [_['question'] for _ in batches]
     answers = [_['answer'] for _ in batches]
     indexes = [_['index'] for _ in batches]
     options = [_['option'] for _ in batches]
-    return pixel_values, questions, answers, indexes, options
+    batch = (pixel_values, questions, answers, indexes, options)
+    if has_history:
+        histories = [_['history'][0] for _ in batches]
+        batch += (histories,)
+    else:
+        batch += (None,)
+    return batch
 
 
 class MMBenchDataset(torch.utils.data.Dataset):
@@ -128,6 +135,94 @@ class MMBenchDataset(torch.utils.data.Dataset):
             'pixel_values': pixel_values,
             'answer': answer,
             'index': index,
+            'option': options,
+            'history': None,
+        }
+
+    def load_from_df(self, idx, key):
+        if key in self.df.iloc[idx] and not pd.isna(self.df.iloc[idx][key]):
+            return self.df.iloc[idx][key]
+        else:
+            return None
+
+
+class MultipleInputsMMBenchDataset(torch.utils.data.Dataset):
+
+    def __init__(self, root, prompt, language, input_size=224, dynamic_image_size=False,
+                 use_thumbnail=False, max_num=6, sep="__sep__"):
+        self.df = pd.read_csv(root, sep='\t')
+        self.prompt = prompt
+        self.language = language
+        self.input_size = input_size
+        self.dynamic_image_size = dynamic_image_size
+        self.use_thumbnail = use_thumbnail
+        self.max_num = max_num
+        self.transform = build_transform(is_train=False, input_size=input_size)
+        self.sep = sep
+
+    def __len__(self):
+        return len(self.df)
+    
+    def _process_image(self, image):
+        image = Image.open(BytesIO(base64.b64decode(image))).convert('RGB')
+        if self.dynamic_image_size:
+            images = dynamic_preprocess(image, image_size=self.input_size,
+                                        use_thumbnail=self.use_thumbnail,
+                                        max_num=self.max_num)
+        else:
+            images = image
+        return images
+
+    def __getitem__(self, idx):
+        _, index = self.df.iloc[idx]['index'].split(self.sep)
+        i_history, image = self.df.iloc[idx]['image'].split(self.sep)
+        q_history, question = self.df.iloc[idx]['question'].split(self.sep)
+        if 'answer' in self.df.iloc[0].keys():
+            answer_or_answers = self.df.iloc[idx]['answer'].split(self.sep)
+            if len(answer_or_answers)==1:
+                a_history, answer = answer_or_answers[0], None
+            else:
+                a_history, answer = answer_or_answers
+        else:
+            a_history, answer = None, None
+        # answer = self.df.iloc[idx]['answer'] if 'answer' in self.df.iloc[0].keys() else None
+        # catetory = self.df.iloc[idx]['category']
+        # l2_catetory = self.df.iloc[idx]['l2-category']
+
+        images = self._process_image(image)
+        images_history = self._process_image(i_history)
+        if self.dynamic_image_size:
+            images=images_history+images
+        else:
+            images = [i_history, image]
+        pixel_values = [self.transform(image) for image in images]
+        pixel_values = torch.stack(pixel_values)
+
+        option_candidate = ['A', 'B', 'C', 'D', 'E']
+        options = {
+            cand: self.load_from_df(idx, cand)
+            for cand in option_candidate
+            if self.load_from_df(idx, cand) is not None
+        }
+
+        hint = self.load_from_df(idx, 'hint')
+        if hint is not None:
+            question = hint + '\n' + question
+        for key, item in options.items():
+            question += f'\n{key}. {item}'
+        if self.language == 'cn':
+            q_history = '<image>\n' + q_history + '\n' + self.prompt['cn']
+            question = '<image>\n' + question + '\n' + self.prompt['cn']
+        else:
+            q_history = '<image>\n' + q_history + '\n' + self.prompt['en']
+            question = '<image>\n' + question + '\n' + self.prompt['en']
+
+        return {
+            'question': question,
+            'history': [(q_history, a_history)],
+            'pixel_values': pixel_values,
+            'answer': answer,
+            'index': index,
             'option': options
         }
 
@@ -183,15 +278,29 @@ def evaluate_chat_model():
     random.seed(args.seed)
 
     for ds_name in args.datasets:
-        dataset = MMBenchDataset(
-            root=ds_collections[ds_name]['root'],
-            prompt=prompt,
-            language=ds_collections[ds_name]['language'],
-            input_size=image_size,
-            dynamic_image_size=args.dynamic,
-            use_thumbnail=use_thumbnail,
-            max_num=args.max_num
-        )
+        if args.root_prefix!='':
+            dataset = MultipleInputsMMBenchDataset(
+                root=ds_collections[ds_name]['root'],
+                prompt=prompt,
+                language=ds_collections[ds_name]['language'],
+                input_size=image_size,
+                dynamic_image_size=args.dynamic,
+                use_thumbnail=use_thumbnail,
+                max_num=args.max_num,
+                sep=args.sep
+            )
+            has_history = True
+        else:
+            dataset = MMBenchDataset(
+                root=ds_collections[ds_name]['root'],
+                prompt=prompt,
+                language=ds_collections[ds_name]['language'],
+                input_size=image_size,
+                dynamic_image_size=args.dynamic,
+                use_thumbnail=use_thumbnail,
+                max_num=args.max_num
+            )
+            has_history = False
         dataloader = torch.utils.data.DataLoader(
             dataset=dataset,
             sampler=InferenceSampler(len(dataset)),
@@ -199,11 +308,11 @@ def evaluate_chat_model():
             num_workers=args.num_workers,
             pin_memory=True,
             drop_last=False,
-            collate_fn=partial(collate_fn, tokenizer=tokenizer),
+            collate_fn=partial(collate_fn, has_history=has_history),
         )
 
         outputs = []
-        for _, (pixel_values, questions, answers, indexes, options) in tqdm(enumerate(dataloader)):
+        for _, (pixel_values, questions, answers, indexes, options, histories) in tqdm(enumerate(dataloader)):
             pixel_values = pixel_values.to(torch.bfloat16).cuda()
             generation_config = dict(
                 num_beams=args.num_beams,
@@ -212,22 +321,32 @@ def evaluate_chat_model():
                 do_sample=True if args.temperature > 0 else False,
                 temperature=args.temperature,
             )
-            pred = model.chat(
+            response = model.chat(
                 tokenizer=tokenizer,
                 pixel_values=pixel_values,
                 question=questions[0],
                 generation_config=generation_config,
                 verbose=False,
                 output_attentions=args.output_attentions,
-                output_hidden_states=True,
+                output_hidden_states=args.output_hidden_states,
+                history=histories,
             )
-            print("type(pred)", type(pred))
-            # print("pred", pred)
+            if isinstance(response, dict):
+                pred = response['response']
+                if args.output_hidden_states:
+                    state = response['hidden_states']
+                if args.output_attentions:
+                    att = response['attentions']
+            else:
+                pred = response
+            # print("type(pred)", type(pred))
+            # print("pred.keys()", pred.keys())
+            # # print("pred", pred)
             # print("pred['response']", pred['response'])
-            print("type(pred['hidden_states'])", type(pred['hidden_states']), len(pred['hidden_states']))
-            print("type(pred['hidden_states'][0])", type(pred['hidden_states'][0]), len(pred['hidden_states'][0]))
-            print("type(pred['hidden_states'][0][0])", type(pred['hidden_states'][0][0]), pred['hidden_states'][0][0].shape)
-            exit()
+            # print("type(pred['hidden_states'])", type(pred['hidden_states']), len(pred['hidden_states']))
+            # print("type(pred['hidden_states'][0])", type(pred['hidden_states'][0]), len(pred['hidden_states'][0]))
+            # print("type(pred['hidden_states'][0][0])", type(pred['hidden_states'][0][0]), pred['hidden_states'][0][0].shape)
+            # exit()
             preds = [post_process(pred, options[0])]
 
             for question, pred, answer, index in zip(questions, preds, answers, indexes):
@@ -254,6 +373,9 @@ def evaluate_chat_model():
             results_file = f'{ds_name}_{time_prefix}.xlsx'
             output_path = os.path.join(args.out_dir, results_file)
             df = pd.read_table(ds_collections[ds_name]['root'])
+            for col in df.columns:
+                if df[col].dtype == 'object':  # 'object' usually means string in pandas
+                    df[col] = df[col].apply(lambda x: x.split(args.sep)[-1] if isinstance(x, str) and args.sep in x else x)
             cur_df = df.copy()
             if 'mmbench' in ds_name:
                 cur_df = cur_df.drop(columns=['hint', 'category', 'source', 'image', 'comment', 'l2-category'])
@@ -285,17 +407,24 @@ if __name__ == '__main__':
     parser.add_argument('--auto', action='store_true')
     parser.add_argument('--output-attentions', action='store_true')
     parser.add_argument('--output-hidden-states', action='store_true')
+    parser.add_argument('--root-prefix', type=str, default="")
+    parser.add_argument('--sep', type=str, default="__sep__")
     args = parser.parse_args()
+    args.root_prefix = re.sub('test', '', args.root_prefix)
 
-    for ky in ds_collections.keys():
-        for ky2, vl2 in ds_collections[ky].items():
-            if isinstance(vl2, str) and '/' in vl2:
-                ds_collections[ky][ky2] = f'{os.getenv("HOME")}/{vl2}'
     if not os.path.exists(args.out_dir):
         os.makedirs(args.out_dir)
 
     args.datasets = args.datasets.split(',')
     print('datasets:', args.datasets)
+    for ds_name in args.datasets:
+        root_path = ds_collections[ds_name]['root']
+        root_dir, root_name = '/'.join(root_path.split('/')[:-1]), root_path.split('/')[-1]
+        root_path = f"{root_dir}/{args.root_prefix}{root_name}"
+        ds_collections[ds_name]['root'] = root_path
+        for ky2, vl2 in ds_collections[ds_name].items():
+            if isinstance(vl2, str) and '/' in vl2:
+                ds_collections[ds_name][ky2] = f'{os.getenv("HOME")}/{vl2}'
     assert args.batch_size == 1, 'Only batch size 1 is supported'
 
     torch.distributed.init_process_group(
