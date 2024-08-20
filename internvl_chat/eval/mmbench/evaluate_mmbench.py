@@ -355,7 +355,7 @@ def evaluate_chat_model():
                     'question': question,
                     'answer': pred,
                     'gt_answers': answer,
-                    'index': index
+                    'index': int(index)
                 })
 
         torch.distributed.barrier()
@@ -377,6 +377,7 @@ def evaluate_chat_model():
             for col in df.columns:
                 if df[col].dtype == 'object':  # 'object' usually means string in pandas
                     df[col] = df[col].apply(lambda x: x.split(args.sep)[-1] if isinstance(x, str) and args.sep in x else x)
+            df['index'] = df['index'].astype(int)
             cur_df = df.copy()
             if 'mmbench' in ds_name:
                 cur_df = cur_df.drop(columns=['hint', 'category', 'source', 'image', 'comment', 'l2-category'])
