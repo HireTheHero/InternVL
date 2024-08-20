@@ -223,7 +223,7 @@ class MultipleInputsMMBenchDataset(torch.utils.data.Dataset):
             'history': [(q_history, a_history)],
             'pixel_values': pixel_values,
             'answer': answer,
-            'index': int(index),
+            'index': index,
             'option': options
         }
 
@@ -355,7 +355,7 @@ def evaluate_chat_model():
                     'question': question,
                     'answer': pred,
                     'gt_answers': answer,
-                    'index': int(index)
+                    'index': index
                 })
 
         torch.distributed.barrier()
