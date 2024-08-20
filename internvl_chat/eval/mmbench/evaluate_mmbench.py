@@ -3,6 +3,7 @@ import base64
 import itertools
 import json
 import os
+import pickle
 import random
 import re
 import time
@@ -222,7 +223,7 @@ class MultipleInputsMMBenchDataset(torch.utils.data.Dataset):
             'history': [(q_history, a_history)],
             'pixel_values': pixel_values,
             'answer': answer,
-            'index': index,
+            'index': int(index),
             'option': options
         }
 
